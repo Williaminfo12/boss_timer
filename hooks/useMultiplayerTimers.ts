@@ -7,59 +7,80 @@ import { Timer } from '../types';
 export const useMultiplayerTimers = (roomName: string) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [peers, setPeers] = useState(0);
-  const [synced, setSynced] = useState(false);
+  const [synced, setSynced] = useState(false); // Local storage synced
+  const [connected, setConnected] = useState(false); // Signaling server connected
   
-  // Refs to keep instances stable across renders
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebrtcProvider | null>(null);
   const persistenceRef = useRef<IndexeddbPersistence | null>(null);
 
   useEffect(() => {
-    // 1. Cleanup previous connection if room changes
+    if (!roomName) return;
+
+    // Cleanup
     if (providerRef.current) providerRef.current.destroy();
     if (persistenceRef.current) persistenceRef.current.destroy();
     if (ydocRef.current) ydocRef.current.destroy();
 
-    // 2. Initialize Y.Doc
+    // Init Y.Doc
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
-    // 3. Connect to WebRTC (Public signaling servers for discovery)
-    // We add a prefix to avoid collisions with other demos
-    const fullRoomName = `lineage-m-timer-v1-${roomName}`;
+    // Room Name: Trim and ensure consistency
+    const fullRoomName = `lineage-m-timer-production-v2-${roomName.trim()}`;
+    
+    // WebRTC Provider
     const provider = new WebrtcProvider(fullRoomName, ydoc, {
-        // Use public signaling servers. In a production app, you'd host your own.
+        // Only use the most reliable public signaling servers
         signaling: [
             'wss://signaling.yjs.dev',
             'wss://y-webrtc-signaling-eu.herokuapp.com',
             'wss://y-webrtc-signaling-us.herokuapp.com'
-        ]
+        ],
+        password: null, 
+        maxConns: 20 + Math.floor(Math.random() * 15),
+        filterBcConns: false,
+        peerOpts: {
+            config: {
+                // GOOGLE STUN IS KING. Others often fail or timeout.
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ]
+            }
+        }
     });
     providerRef.current = provider;
 
-    // 4. Connect to IndexedDB for offline persistence
+    // IndexedDB Persistence
     const persistence = new IndexeddbPersistence(fullRoomName, ydoc);
     persistenceRef.current = persistence;
 
     const yArray = ydoc.getArray<Timer>('timers');
 
-    // 5. Handle updates
+    // Sync Handlers
     const handleSync = () => {
        setTimers(yArray.toArray());
     };
 
-    // Observer: fires whenever the shared array changes (from anyone)
     yArray.observe(handleSync);
     
-    // Persistence Loaded: fires when data is loaded from local IDB
     persistence.on('synced', () => {
         setSynced(true);
         handleSync(); 
     });
 
-    // Peer tracking: update count of connected users
+    // Connection Status Events
     provider.on('peers', ({ webrtcPeers }: any) => {
         setPeers(webrtcPeers.size);
+    });
+
+    // Monitor Signaling Connection
+    provider.on('status', (event: { connected: boolean }) => {
+        setConnected(event.connected);
     });
 
     return () => {
@@ -75,7 +96,6 @@ export const useMultiplayerTimers = (roomName: string) => {
       const yArray = ydocRef.current.getArray<Timer>('timers');
       
       ydocRef.current.transact(() => {
-          // Remove existing timer for this boss (overwrite behavior)
           const current = yArray.toArray();
           let index = -1;
           for(let i=0; i<current.length; i++) {
@@ -110,9 +130,6 @@ export const useMultiplayerTimers = (roomName: string) => {
   };
 
   const updateTimer = (timer: Timer) => {
-      // Logic is same as add (replace by boss name/ID)
-      // Since our addTimer logic finds by BossName, we might need to be careful if we change names
-      // But boss names are constant keys here.
       addTimer(timer);
   };
   
@@ -122,6 +139,7 @@ export const useMultiplayerTimers = (roomName: string) => {
       removeTimer,
       updateTimer,
       peers,
-      synced
+      synced,
+      connected // Expose connection status
   };
 };

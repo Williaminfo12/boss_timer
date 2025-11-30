@@ -7,14 +7,14 @@ import TimerList from './components/TimerList';
 import EditModal from './components/EditModal';
 import ActionMenu from './components/ActionMenu';
 import { useMultiplayerTimers } from './hooks/useMultiplayerTimers';
-import { Copy, AlertTriangle, Search, ArrowUpDown, Users, Wifi } from 'lucide-react';
+import { Copy, AlertTriangle, Search, ArrowUpDown, Users, Wifi, RefreshCw } from 'lucide-react';
 
 type SortOption = 'nextSpawn' | 'name' | 'killTime';
 
 const App: React.FC = () => {
   // Multiplayer State
   const [roomName, setRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
-  const { timers, addTimer, removeTimer, updateTimer, peers, synced } = useMultiplayerTimers(roomName);
+  const { timers, addTimer, removeTimer, updateTimer, peers, synced, connected } = useMultiplayerTimers(roomName);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -256,6 +256,15 @@ const App: React.FC = () => {
     return result;
   }, [timers, searchTerm, sortBy]);
 
+  // Determine Connection Status Color/Text
+  const getConnectionStatus = () => {
+      if (peers > 0) return { color: 'text-blue-400 bg-blue-900/30', text: `${peers} 連線`, icon: <Users size={10} /> };
+      if (connected) return { color: 'text-green-400 bg-green-900/30', text: '已連線', icon: <Wifi size={10} /> };
+      return { color: 'text-zinc-500 bg-zinc-800', text: '離線', icon: <Wifi size={10} className="opacity-50" /> };
+  };
+
+  const connStatus = getConnectionStatus();
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-yellow-500/30">
       <header className="fixed top-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 z-40">
@@ -272,19 +281,18 @@ const App: React.FC = () => {
                         type="text" 
                         value={roomName}
                         onChange={(e) => setRoomName(e.target.value)}
-                        className="bg-transparent border-b border-zinc-700 text-[10px] text-zinc-300 w-16 focus:outline-none focus:border-yellow-600 focus:w-24 transition-all"
+                        className="bg-transparent border-b border-zinc-700 text-[10px] text-zinc-300 w-16 focus:outline-none focus:border-yellow-600 focus:w-24 transition-all font-mono"
                         placeholder="RoomID"
                     />
-                    <div className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${synced ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
-                        <Wifi size={8} />
-                        <span>{synced ? 'Sync' : 'Off'}</span>
-                    </div>
-                    {peers > 0 && (
-                        <div className="flex items-center gap-1 text-[10px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded-full">
-                            <Users size={8} />
-                            <span>{peers}</span>
-                        </div>
-                    )}
+                    
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full transition-colors ${connStatus.color}`}
+                        title="點擊重新整理以重連"
+                    >
+                        {connStatus.icon}
+                        <span className="font-medium">{connStatus.text}</span>
+                    </button>
                 </div>
              </div>
           </div>
