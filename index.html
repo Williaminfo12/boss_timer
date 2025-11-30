@@ -29,10 +29,11 @@
       // Make Buffer available globally
       if (window.buffer && window.buffer.Buffer) {
         window.Buffer = window.buffer.Buffer;
+        window.global = window;
+        window.globalThis = window;
       }
       
       // Node.js globals polyfills
-      window.global = window;
       window.process = {
         env: { NODE_ENV: 'production' },
         nextTick: function(fn) { setTimeout(fn, 0); },
@@ -41,7 +42,7 @@
 
       // Global Error Handler
       window.onerror = function(msg, url, line, col, error) {
-        if (msg && msg.includes && msg.includes('ResizeObserver')) return;
+        if (msg && typeof msg === 'string' && msg.includes('ResizeObserver')) return;
         
         console.error("Global Error:", msg, error);
 
@@ -82,8 +83,8 @@
         "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
         "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
         "yjs": "https://esm.sh/yjs@13.6.18",
-        "y-webrtc": "https://esm.sh/y-webrtc@10.3.0?bundle&external=yjs",
-        "y-indexeddb": "https://esm.sh/y-indexeddb@9.0.12?bundle&external=yjs"
+        "y-webrtc": "https://esm.sh/y-webrtc@10.3.0?bundle&deps=yjs@13.6.18",
+        "y-indexeddb": "https://esm.sh/y-indexeddb@9.0.12?bundle&deps=yjs@13.6.18"
       }
     }
     </script>

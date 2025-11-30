@@ -17,7 +17,7 @@ export const useMultiplayerTimers = (roomName: string) => {
   useEffect(() => {
     if (!roomName) return;
 
-    // Cleanup
+    // Cleanup previous instance
     if (providerRef.current) providerRef.current.destroy();
     if (persistenceRef.current) persistenceRef.current.destroy();
     if (ydocRef.current) ydocRef.current.destroy();
@@ -26,42 +26,40 @@ export const useMultiplayerTimers = (roomName: string) => {
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
-    // Room Name: Trim and ensure consistency
+    // Connect to WebRTC
+    // Using a specific prefix to avoid public collision
     const fullRoomName = `lineage-m-timer-production-v2-${roomName.trim()}`;
     
-    // WebRTC Provider
+    // Note: We rely on WebrtcProvider to create its own Awareness instance internally
+    // to avoid "Y.Awareness is not a constructor" errors with esm.sh imports.
     const provider = new WebrtcProvider(fullRoomName, ydoc, {
-        // Only use the most reliable public signaling servers
+        // Signaling servers - prioritized order
         signaling: [
-            'wss://signaling.yjs.dev',
             'wss://y-webrtc-signaling-eu.herokuapp.com',
-            'wss://y-webrtc-signaling-us.herokuapp.com'
+            'wss://y-webrtc-signaling-us.herokuapp.com',
+            'wss://signaling.yjs.dev'
         ],
         password: null, 
-        maxConns: 20 + Math.floor(Math.random() * 15),
-        filterBcConns: false,
+        filterBcConns: false, // Enable cross-tab communication
         peerOpts: {
             config: {
-                // GOOGLE STUN IS KING. Others often fail or timeout.
+                // STUN servers for NAT traversal (Mobile <-> Desktop)
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' }
+                    { urls: 'stun:global.stun.twilio.com:3478' }
                 ]
             }
         }
     });
     providerRef.current = provider;
 
-    // IndexedDB Persistence
+    // Persistence (Offline Support)
     const persistence = new IndexeddbPersistence(fullRoomName, ydoc);
     persistenceRef.current = persistence;
 
     const yArray = ydoc.getArray<Timer>('timers');
 
-    // Sync Handlers
+    // Handlers
     const handleSync = () => {
        setTimers(yArray.toArray());
     };
@@ -73,12 +71,10 @@ export const useMultiplayerTimers = (roomName: string) => {
         handleSync(); 
     });
 
-    // Connection Status Events
     provider.on('peers', ({ webrtcPeers }: any) => {
         setPeers(webrtcPeers.size);
     });
 
-    // Monitor Signaling Connection
     provider.on('status', (event: { connected: boolean }) => {
         setConnected(event.connected);
     });
@@ -90,7 +86,6 @@ export const useMultiplayerTimers = (roomName: string) => {
     };
   }, [roomName]);
 
-  // Actions
   const addTimer = (timer: Timer) => {
       if (!ydocRef.current) return;
       const yArray = ydocRef.current.getArray<Timer>('timers');
@@ -140,6 +135,6 @@ export const useMultiplayerTimers = (roomName: string) => {
       updateTimer,
       peers,
       synced,
-      connected // Expose connection status
+      connected
   };
 };
