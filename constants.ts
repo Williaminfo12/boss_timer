@@ -35,3 +35,14 @@ export const BOSS_DATA: Boss[] = [
 ];
 
 export const APP_TITLE = "天堂M BOSS 計時器";
+
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBG1Xtfo-gXAaaq-veWA7bjG4FtyBRNq2M",
+  authDomain: "bosstimer-a1514.firebaseapp.com",
+  databaseURL: "https://bosstimer-a1514-default-rtdb.firebaseio.com",
+  projectId: "bosstimer-a1514",
+  storageBucket: "bosstimer-a1514.firebasestorage.app",
+  messagingSenderId: "9859647388",
+  appId: "1:9859647388:web:45defbb9e358038a4baa59",
+  measurementId: "G-9N8G46ZY7S"
+};

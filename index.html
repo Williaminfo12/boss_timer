@@ -23,42 +23,15 @@
       }
     </script>
     
-    <!-- Buffer Polyfill: Critical for y-webrtc to work in browser -->
-    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
-    <script>
-      // Make Buffer available globally
-      if (window.buffer && window.buffer.Buffer) {
-        window.Buffer = window.buffer.Buffer;
-        window.global = window;
-        window.globalThis = window;
-      }
-      
-      // Node.js globals polyfills
-      window.process = {
-        env: { NODE_ENV: 'production' },
-        nextTick: function(fn) { setTimeout(fn, 0); },
-        version: ''
-      };
+    <!-- Load Firebase Compat SDKs (Most stable for this environment) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
+    <script>
       // Global Error Handler
       window.onerror = function(msg, url, line, col, error) {
         if (msg && typeof msg === 'string' && msg.includes('ResizeObserver')) return;
-        
         console.error("Global Error:", msg, error);
-
-        const root = document.getElementById('root');
-        if (root && root.innerHTML.trim() === '') {
-          document.body.innerHTML = `
-            <div style="padding:20px; color:#fca5a5; background:#09090b; font-family:monospace; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; overflow:hidden;">
-              <h2 style="font-size:1.5rem; margin-bottom:15px; color:#fff;">⚠️ Application Error</h2>
-              <div style="background:#1f2937; padding:15px; border-radius:8px; max-width:90%; overflow-x:auto; border:1px solid #374151;">
-                <p style="margin:0; text-align:left;">${msg}</p>
-              </div>
-              <p style="margin-top:20px; color:#9ca3af; font-size:0.9rem;">The app failed to initialize properly.</p>
-              <button onclick="window.location.reload()" style="margin-top:25px; padding:12px 24px; background:#2563eb; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Reload Page</button>
-            </div>
-          `;
-        }
       };
     </script>
 
@@ -81,10 +54,7 @@
         "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
         "react/": "https://aistudiocdn.com/react@^19.2.0/",
         "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-        "yjs": "https://esm.sh/yjs@13.6.18",
-        "y-webrtc": "https://esm.sh/y-webrtc@10.3.0?bundle&deps=yjs@13.6.18",
-        "y-indexeddb": "https://esm.sh/y-indexeddb@9.0.12?bundle&deps=yjs@13.6.18"
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
       }
     }
     </script>

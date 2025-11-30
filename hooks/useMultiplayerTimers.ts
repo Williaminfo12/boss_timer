@@ -1,140 +1,170 @@
 import { useState, useEffect, useRef } from 'react';
-import * as Y from 'yjs';
-import { WebrtcProvider } from 'y-webrtc';
-import { IndexeddbPersistence } from 'y-indexeddb';
 import { Timer } from '../types';
+import { FIREBASE_CONFIG } from '../constants';
+
+// Define global firebase interface
+declare global {
+  interface Window {
+    firebase: any;
+  }
+}
+
+const STORAGE_KEY = 'lm_firebase_config';
 
 export const useMultiplayerTimers = (roomName: string) => {
   const [timers, setTimers] = useState<Timer[]>([]);
-  const [peers, setPeers] = useState(0);
-  const [synced, setSynced] = useState(false); // Local storage synced
-  const [connected, setConnected] = useState(false); // Signaling server connected
+  const [connected, setConnected] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(false);
   
-  const ydocRef = useRef<Y.Doc | null>(null);
-  const providerRef = useRef<WebrtcProvider | null>(null);
-  const persistenceRef = useRef<IndexeddbPersistence | null>(null);
+  // Use 'any' to bypass TS checks for the global firebase object
+  const dbRef = useRef<any>(null);
 
+  // Initialize Firebase using the global window.firebase object
   useEffect(() => {
-    if (!roomName) return;
+    const initFirebase = () => {
+        // Wait for Firebase script to load
+        if (!window.firebase) {
+            setTimeout(initFirebase, 100);
+            return;
+        }
 
-    // Cleanup previous instance
-    if (providerRef.current) providerRef.current.destroy();
-    if (persistenceRef.current) persistenceRef.current.destroy();
-    if (ydocRef.current) ydocRef.current.destroy();
+        const customConfigStr = localStorage.getItem(STORAGE_KEY);
+        let configToUse = FIREBASE_CONFIG;
 
-    // Init Y.Doc
-    const ydoc = new Y.Doc();
-    ydocRef.current = ydoc;
-
-    // Connect to WebRTC
-    // Using a specific prefix to avoid public collision
-    const fullRoomName = `lineage-m-timer-production-v2-${roomName.trim()}`;
-    
-    // Note: We rely on WebrtcProvider to create its own Awareness instance internally
-    // to avoid "Y.Awareness is not a constructor" errors with esm.sh imports.
-    const provider = new WebrtcProvider(fullRoomName, ydoc, {
-        // Signaling servers - prioritized order
-        signaling: [
-            'wss://y-webrtc-signaling-eu.herokuapp.com',
-            'wss://y-webrtc-signaling-us.herokuapp.com',
-            'wss://signaling.yjs.dev'
-        ],
-        password: null, 
-        filterBcConns: false, // Enable cross-tab communication
-        peerOpts: {
-            config: {
-                // STUN servers for NAT traversal (Mobile <-> Desktop)
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ]
+        // Load custom config if exists
+        if (customConfigStr) {
+            try {
+                const parsed = JSON.parse(customConfigStr);
+                if (parsed.apiKey && parsed.databaseURL) {
+                    configToUse = parsed;
+                } else {
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            } catch (e) {
+                localStorage.removeItem(STORAGE_KEY);
             }
         }
-    });
-    providerRef.current = provider;
 
-    // Persistence (Offline Support)
-    const persistence = new IndexeddbPersistence(fullRoomName, ydoc);
-    persistenceRef.current = persistence;
+        // Force correct database URL for your specific project
+        if (configToUse.projectId === "bosstimer-a1514") {
+            configToUse = {
+                ...configToUse,
+                databaseURL: "https://bosstimer-a1514-default-rtdb.firebaseio.com"
+            };
+        }
 
-    const yArray = ydoc.getArray<Timer>('timers');
+        if (configToUse && configToUse.databaseURL) {
+            setIsConfigured(true);
+            try {
+                // Initialize App (if not already initialized)
+                if (!window.firebase.apps.length) {
+                    window.firebase.initializeApp(configToUse);
+                } else {
+                    // If config changed, delete and re-init (rare case)
+                    const app = window.firebase.app();
+                    if (app.options.apiKey !== configToUse.apiKey) {
+                        app.delete().then(() => {
+                            window.firebase.initializeApp(configToUse);
+                        });
+                    }
+                }
 
-    // Handlers
-    const handleSync = () => {
-       setTimers(yArray.toArray());
+                // Get Database Reference
+                dbRef.current = window.firebase.database();
+                
+                // Monitor connection state
+                const connectedRef = dbRef.current.ref(".info/connected");
+                connectedRef.on("value", (snap: any) => {
+                    if (snap.val() === true) {
+                        setConnected(true);
+                    } else {
+                        setConnected(false);
+                    }
+                });
+
+            } catch (e) {
+                console.error("Firebase Init Error:", e);
+                setConnected(false);
+            }
+        } else {
+            console.error("Missing Database URL");
+            setConnected(false);
+        }
     };
 
-    yArray.observe(handleSync);
-    
-    persistence.on('synced', () => {
-        setSynced(true);
-        handleSync(); 
-    });
+    initFirebase();
+  }, []);
 
-    provider.on('peers', ({ webrtcPeers }: any) => {
-        setPeers(webrtcPeers.size);
-    });
+  const saveConfig = (config: any) => {
+    if (!config.databaseURL) {
+      alert("錯誤：設定檔缺少 databaseURL");
+      return;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    setIsConfigured(true);
+    window.location.reload();
+  };
 
-    provider.on('status', (event: { connected: boolean }) => {
-        setConnected(event.connected);
-    });
+  // Sync Logic
+  useEffect(() => {
+    if (!dbRef.current || !roomName) return;
+
+    const normalizedRoom = roomName.trim().toLowerCase() || 'main';
+    const timersRef = dbRef.current.ref(`rooms/${normalizedRoom}/timers`);
+
+    const handleValue = (snapshot: any) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedTimers = Object.values(data) as Timer[];
+        setTimers(loadedTimers);
+      } else {
+        setTimers([]);
+      }
+    };
+
+    timersRef.on('value', handleValue);
 
     return () => {
-        provider.destroy();
-        persistence.destroy();
-        ydoc.destroy();
+        timersRef.off('value', handleValue);
     };
-  }, [roomName]);
+  }, [roomName, connected]); // Wait for connection
 
+  // Actions
   const addTimer = (timer: Timer) => {
-      if (!ydocRef.current) return;
-      const yArray = ydocRef.current.getArray<Timer>('timers');
-      
-      ydocRef.current.transact(() => {
-          const current = yArray.toArray();
-          let index = -1;
-          for(let i=0; i<current.length; i++) {
-              if (current[i].bossName === timer.bossName) {
-                  index = i;
-                  break;
-              }
-          }
-          if (index !== -1) {
-              yArray.delete(index, 1);
-          }
-          yArray.push([timer]);
-      });
+    if (!dbRef.current || !roomName) return;
+    const normalizedRoom = roomName.trim().toLowerCase() || 'main';
+    
+    const existing = timers.find(t => t.bossName === timer.bossName);
+    const updates: any = {};
+    
+    // Use multi-path update to delete old and add new atomically
+    if (existing) {
+        updates[`rooms/${normalizedRoom}/timers/${existing.id}`] = null;
+    }
+    updates[`rooms/${normalizedRoom}/timers/${timer.id}`] = timer;
+    
+    dbRef.current.ref().update(updates);
   };
 
   const removeTimer = (id: string) => {
-       if (!ydocRef.current) return;
-       const yArray = ydocRef.current.getArray<Timer>('timers');
-       ydocRef.current.transact(() => {
-          const current = yArray.toArray();
-          let index = -1;
-          for(let i=0; i<current.length; i++) {
-              if (current[i].id === id) {
-                  index = i;
-                  break;
-              }
-          }
-          if (index !== -1) {
-              yArray.delete(index, 1);
-          }
-       });
+    if (!dbRef.current || !roomName) return;
+    const normalizedRoom = roomName.trim().toLowerCase() || 'main';
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${id}`).remove();
   };
 
   const updateTimer = (timer: Timer) => {
-      addTimer(timer);
+    if (!dbRef.current || !roomName) return;
+    const normalizedRoom = roomName.trim().toLowerCase() || 'main';
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${timer.id}`).set(timer);
   };
   
   return {
-      timers,
-      addTimer,
-      removeTimer,
-      updateTimer,
-      peers,
-      synced,
-      connected
+    timers,
+    addTimer,
+    removeTimer,
+    updateTimer,
+    connected,
+    isConfigured,
+    saveConfig
   };
 };

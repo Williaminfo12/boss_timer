@@ -1,38 +1,49 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Timer, InputMode } from './types';
-import { BOSS_DATA, APP_TITLE } from './constants';
+import { BOSS_DATA, APP_TITLE, FIREBASE_CONFIG } from './constants';
 import { parseCommandWithGemini } from './services/geminiService';
 import InputBar from './components/InputBar';
 import TimerList from './components/TimerList';
 import EditModal from './components/EditModal';
 import ActionMenu from './components/ActionMenu';
+import ConfigModal from './components/ConfigModal';
 import { useMultiplayerTimers } from './hooks/useMultiplayerTimers';
-import { Copy, AlertTriangle, Search, ArrowUpDown, Users, Wifi, RefreshCw } from 'lucide-react';
+import { Copy, AlertTriangle, Search, ArrowUpDown, Database, Wifi, Settings } from 'lucide-react';
 
 type SortOption = 'nextSpawn' | 'name' | 'killTime';
 
 const App: React.FC = () => {
-  // Multiplayer State
-  const [roomName, setRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
-  const { timers, addTimer, removeTimer, updateTimer, peers, synced, connected } = useMultiplayerTimers(roomName);
+  const [localRoomName, setLocalRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
+  const [activeRoomName, setActiveRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
+
+  const { timers, addTimer, removeTimer, updateTimer, connected, isConfigured, saveConfig } = useMultiplayerTimers(activeRoomName);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
-  // Sorting and Filtering State
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('nextSpawn');
 
-  // Edit State
   const [editingTimer, setEditingTimer] = useState<Timer | null>(null);
-  
-  // Action Menu State
   const [actionMenuTimer, setActionMenuTimer] = useState<Timer | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
 
-  // Persist Room Name preference
   useEffect(() => {
-    localStorage.setItem('lm_room_id', roomName);
-  }, [roomName]);
+    localStorage.setItem('lm_room_id', activeRoomName);
+  }, [activeRoomName]);
+
+  const handleRoomNameSubmit = () => {
+    if (localRoomName.trim() !== activeRoomName) {
+      setActiveRoomName(localRoomName.trim());
+    }
+  };
+
+  const handleRoomNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRoomNameSubmit();
+      (e.target as HTMLInputElement).blur();
+    }
+  };
 
   const calculateTimes = (bossRespawnHours: number, hour: number, minute: number, mode: InputMode) => {
     const now = new Date();
@@ -43,34 +54,30 @@ const App: React.FC = () => {
     let nextSpawnTime: number;
 
     if (mode === 'kill') {
-      // Mode 1: Kill Time Input
-      // If input > now + 15m, assume yesterday
       if (inputDate.getTime() > now.getTime() + 15 * 60 * 1000) {
           inputDate.setDate(inputDate.getDate() - 1);
       }
       killTime = inputDate.getTime();
       nextSpawnTime = killTime + bossRespawnHours * 60 * 60 * 1000;
-
     } else {
-      // Mode 2: Respawn Time Input (Manual Override)
-      // If input < now - 15m, assume tomorrow
       if (inputDate.getTime() < now.getTime() - 15 * 60 * 1000) {
           inputDate.setDate(inputDate.getDate() + 1);
       }
       nextSpawnTime = inputDate.getTime();
-      // Back-calculate kill time
       killTime = nextSpawnTime - bossRespawnHours * 60 * 60 * 1000;
     }
-
     return { killTime, nextSpawnTime };
   };
 
   const handleCommand = async (input: string, mode: InputMode) => {
+    if (!connected) {
+        setErrorMsg("尚未連線至資料庫，請檢查網路或設定");
+        return;
+    }
     setIsProcessing(true);
     setErrorMsg(null);
 
     try {
-      // 1. Parse with Gemini
       const result = await parseCommandWithGemini(input);
 
       if (result.error || !result.bossName || result.hour === null || result.minute === null) {
@@ -79,7 +86,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // 2. Find Boss Data
       const boss = BOSS_DATA.find(b => b.name === result.bossName);
       if (!boss) {
         setErrorMsg(`找不到 Boss: ${result.bossName}`);
@@ -87,7 +93,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // 3. Calculate Timestamps
       const { killTime, nextSpawnTime } = calculateTimes(boss.respawnHours, result.hour, result.minute, mode);
 
       const newTimer: Timer = {
@@ -99,7 +104,6 @@ const App: React.FC = () => {
         originalInput: input
       };
 
-      // 4. Update List via Multiplayer Hook
       addTimer(newTimer);
 
     } catch (e) {
@@ -111,7 +115,6 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTimer = (id: string, timeStr: string, mode: InputMode, isPass: boolean) => {
-    // Basic validation for HHMM
     if (!/^\d{3,4}$/.test(timeStr)) {
         setErrorMsg("時間格式錯誤，請輸入 3-4 位數字 (例如 0300)");
         return;
@@ -123,7 +126,6 @@ const App: React.FC = () => {
     const boss = BOSS_DATA.find(b => b.name === timer.bossName);
     if (!boss) return;
 
-    // Parse HHMM
     let hour = 0, minute = 0;
     if (timeStr.length === 3) {
         hour = parseInt(timeStr.substring(0, 1));
@@ -145,16 +147,13 @@ const App: React.FC = () => {
         killTime,
         nextSpawn: nextSpawnTime,
         isPass,
-        // Reset note if time is manually changed
         note: undefined, 
         originalInput: `(Edit) ${timeStr} ${timer.bossName}`
     };
 
-    // Update via Multiplayer Hook
     updateTimer(updatedTimer);
   };
 
-  // Quick Action: Kill (Set kill time to Now)
   const handleQuickKill = (timer: Timer) => {
     const boss = BOSS_DATA.find(b => b.name === timer.bossName);
     if (!boss) return;
@@ -167,14 +166,13 @@ const App: React.FC = () => {
         killTime: now,
         nextSpawn: nextSpawn,
         isPass: false,
-        note: undefined, // Clear note on kill
+        note: undefined,
         originalInput: `Quick Kill`
     };
     updateTimer(updated);
     setActionMenuTimer(null);
   };
 
-  // Quick Action: Pass (Add one respawn interval to the current expected time)
   const handleQuickPass = (timer: Timer) => {
     const boss = BOSS_DATA.find(b => b.name === timer.bossName);
     if (!boss) return;
@@ -184,17 +182,16 @@ const App: React.FC = () => {
     
     const updated: Timer = {
         ...timer,
-        killTime: currentSpawn, // The 'kill/check' time becomes the previous missed spawn
+        killTime: currentSpawn,
         nextSpawn: currentSpawn + intervalMs,
         isPass: true,
-        note: undefined, // Clear note on pass
+        note: undefined,
         originalInput: `Quick Pass`
     };
     updateTimer(updated);
     setActionMenuTimer(null);
   };
 
-  // Quick Action: Mark as Unknown
   const handleQuickUnknown = (timer: Timer) => {
     const updated: Timer = {
         ...timer,
@@ -214,56 +211,33 @@ const App: React.FC = () => {
       const passStr = t.isPass ? '(過)' : '';
       const noteStr = t.note ? ` (${t.note})` : '';
       const status = Date.now() >= t.nextSpawn ? ' [已出]' : '';
-      
-      // Look up alias for clipboard copy too
       const boss = BOSS_DATA.find(b => b.name === t.bossName);
       const displayName = boss && boss.aliases.length > 0 ? boss.aliases[0] : t.bossName;
-      
       return `${timeStr} ${displayName}${passStr}${noteStr}${status}`;
     }).join('\n');
 
     navigator.clipboard.writeText(listText).then(() => {
-       // Optional toast
     }).catch(console.error);
-    
     alert("已複製到剪貼簿！");
   };
 
-  // Compute displayed timers
   const displayedTimers = useMemo(() => {
     let result = [...timers];
-
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       result = result.filter(t => {
-          // Search by name OR alias
           const boss = BOSS_DATA.find(b => b.name === t.bossName);
           const aliases = boss ? boss.aliases.join(' ') : '';
           return t.bossName.toLowerCase().includes(term) || aliases.toLowerCase().includes(term);
       });
     }
-
     result.sort((a, b) => {
-      if (sortBy === 'name') {
-        return a.bossName.localeCompare(b.bossName, 'zh-TW');
-      } else if (sortBy === 'killTime') {
-        return b.killTime - a.killTime;
-      } else {
-        return a.nextSpawn - b.nextSpawn;
-      }
+      if (sortBy === 'name') return a.bossName.localeCompare(b.bossName, 'zh-TW');
+      else if (sortBy === 'killTime') return b.killTime - a.killTime;
+      else return a.nextSpawn - b.nextSpawn;
     });
-
     return result;
   }, [timers, searchTerm, sortBy]);
-
-  // Determine Connection Status Color/Text
-  const getConnectionStatus = () => {
-      if (peers > 0) return { color: 'text-blue-400 bg-blue-900/30', text: `${peers} 連線`, icon: <Users size={10} /> };
-      if (connected) return { color: 'text-green-400 bg-green-900/30', text: '已連線', icon: <Wifi size={10} /> };
-      return { color: 'text-zinc-500 bg-zinc-800', text: '離線', icon: <Wifi size={10} className="opacity-50" /> };
-  };
-
-  const connStatus = getConnectionStatus();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-yellow-500/30">
@@ -279,31 +253,42 @@ const App: React.FC = () => {
                     <span className="text-[10px] text-zinc-500">Room:</span>
                     <input 
                         type="text" 
-                        value={roomName}
-                        onChange={(e) => setRoomName(e.target.value)}
+                        value={localRoomName}
+                        onChange={(e) => setLocalRoomName(e.target.value)}
+                        onBlur={handleRoomNameSubmit}
+                        onKeyDown={handleRoomNameKeyDown}
                         className="bg-transparent border-b border-zinc-700 text-[10px] text-zinc-300 w-16 focus:outline-none focus:border-yellow-600 focus:w-24 transition-all font-mono"
                         placeholder="RoomID"
                     />
                     
                     <button 
                         onClick={() => window.location.reload()}
-                        className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full transition-colors ${connStatus.color}`}
-                        title="點擊重新整理以重連"
+                        className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full transition-colors ${connected ? 'text-green-400 bg-green-900/30' : 'text-zinc-400 bg-zinc-800'}`}
+                        title="連線狀態"
                     >
-                        {connStatus.icon}
-                        <span className="font-medium">{connStatus.text}</span>
+                        {connected ? <Database size={10} /> : <Wifi size={10} />}
+                        <span className="font-medium">{connected ? '已連線' : '離線'}</span>
                     </button>
                 </div>
              </div>
           </div>
-          <button 
-            onClick={copyToClipboard}
-            disabled={timers.length === 0}
-            className="p-2 text-zinc-400 hover:text-yellow-400 disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors"
-            title="複製清單"
-          >
-            <Copy size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+                onClick={() => setShowConfig(true)}
+                className="p-2 text-zinc-400 hover:text-blue-400 transition-colors"
+                title="設定"
+            >
+                <Settings size={22} />
+            </button>
+            <button 
+                onClick={copyToClipboard}
+                disabled={timers.length === 0}
+                className="p-2 text-zinc-400 hover:text-yellow-400 disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors"
+                title="複製清單"
+            >
+                <Copy size={22} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -313,6 +298,14 @@ const App: React.FC = () => {
             <AlertTriangle className="shrink-0" size={20} />
             <p>{errorMsg}</p>
           </div>
+        )}
+        
+        {!isConfigured && !showConfig && (
+            <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-xl flex flex-col gap-2 text-blue-200 text-center items-center">
+                <Database size={32} />
+                <h3 className="font-bold text-lg">尚未設定資料庫</h3>
+                <p className="text-sm opacity-80">使用內建設定連線中...</p>
+            </div>
         )}
 
         {timers.length > 0 && (
@@ -378,6 +371,14 @@ const App: React.FC = () => {
             onKill={handleQuickKill}
             onPass={handleQuickPass}
             onUnknown={handleQuickUnknown}
+        />
+      )}
+
+      {showConfig && (
+        <ConfigModal 
+            currentConfig={localStorage.getItem('lm_firebase_config') ? JSON.parse(localStorage.getItem('lm_firebase_config')!) : FIREBASE_CONFIG}
+            onSave={saveConfig}
+            onClose={() => setShowConfig(false)}
         />
       )}
     </div>
