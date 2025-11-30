@@ -23,9 +23,14 @@
       }
     </script>
     <script>
-      // Polyfills for y-webrtc/simple-peer compatibility in browser
+      // Robust Polyfills for Node.js globals required by y-webrtc and simple-peer
+      // This prevents the "white screen" crash
       window.global = window;
-      window.process = window.process || { env: { NODE_ENV: 'production' } };
+      window.process = {
+        env: { NODE_ENV: 'production' },
+        nextTick: function(fn) { setTimeout(fn, 0); },
+        version: ''
+      };
     </script>
     <style>
       body {
@@ -56,9 +61,9 @@
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
-    "yjs": "https://esm.sh/yjs@13.6.18",
-    "y-webrtc": "https://esm.sh/y-webrtc@10.3.0?external=yjs",
-    "y-indexeddb": "https://esm.sh/y-indexeddb@9.0.12?external=yjs"
+    "yjs": "https://esm.sh/yjs@13?bundle",
+    "y-webrtc": "https://esm.sh/y-webrtc@10?external=yjs",
+    "y-indexeddb": "https://esm.sh/y-indexeddb@9?external=yjs"
   }
 }
 </script>

@@ -6,10 +6,11 @@ interface TimerListProps {
   timers: Timer[];
   onRemove: (id: string) => void;
   onEdit: (timer: Timer) => void;
+  onSelect: (timer: Timer) => void;
   isFiltered?: boolean;
 }
 
-const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, isFiltered = false }) => {
+const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelect, isFiltered = false }) => {
   // Trigger re-render every minute to update "time remaining" logic if needed
   const [, setTick] = useState(0);
 
@@ -69,7 +70,8 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, isFilte
           {timers.map((timer) => (
             <div 
                 key={timer.id} 
-                className={`relative pl-3 pr-2 py-2 rounded-lg border border-zinc-700/50 shadow-sm flex items-center justify-between transition-all group ${getRowBackground(timer)}`}
+                onClick={() => onSelect(timer)}
+                className={`relative pl-3 pr-2 py-2 rounded-lg border border-zinc-700/50 shadow-sm flex items-center justify-between transition-all cursor-pointer hover:brightness-110 active:scale-[0.99] group ${getRowBackground(timer)}`}
             >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span className={`font-mono text-xl font-bold tracking-tight min-w-[3.5rem] text-center ${getStatusColor(timer)}`}>
@@ -98,14 +100,20 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, isFilte
 
                 <div className="flex items-center gap-1 ml-2">
                   <button
-                      onClick={() => onEdit(timer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(timer);
+                      }}
                       className="p-2 text-zinc-500 hover:text-blue-400 hover:bg-zinc-700/50 rounded-lg transition-colors"
                       aria-label="Edit timer"
                   >
                       <Pencil size={18} />
                   </button>
                   <button
-                      onClick={() => onRemove(timer.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(timer.id);
+                      }}
                       className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-700/50 rounded-lg transition-colors"
                       aria-label="Remove timer"
                   >

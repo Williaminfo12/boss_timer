@@ -5,6 +5,7 @@ import { parseCommandWithGemini } from './services/geminiService';
 import InputBar from './components/InputBar';
 import TimerList from './components/TimerList';
 import EditModal from './components/EditModal';
+import ActionMenu from './components/ActionMenu';
 import { useMultiplayerTimers } from './hooks/useMultiplayerTimers';
 import { Copy, AlertTriangle, Search, ArrowUpDown, Users, Wifi } from 'lucide-react';
 
@@ -24,6 +25,9 @@ const App: React.FC = () => {
 
   // Edit State
   const [editingTimer, setEditingTimer] = useState<Timer | null>(null);
+  
+  // Action Menu State
+  const [actionMenuTimer, setActionMenuTimer] = useState<Timer | null>(null);
 
   // Persist Room Name preference
   useEffect(() => {
@@ -148,6 +152,44 @@ const App: React.FC = () => {
     updateTimer(updatedTimer);
   };
 
+  // Quick Action: Kill (Set kill time to Now)
+  const handleQuickKill = (timer: Timer) => {
+    const boss = BOSS_DATA.find(b => b.name === timer.bossName);
+    if (!boss) return;
+
+    const now = Date.now();
+    const nextSpawn = now + boss.respawnHours * 60 * 60 * 1000;
+
+    const updated: Timer = {
+        ...timer,
+        killTime: now,
+        nextSpawn: nextSpawn,
+        isPass: false,
+        originalInput: `Quick Kill`
+    };
+    updateTimer(updated);
+    setActionMenuTimer(null);
+  };
+
+  // Quick Action: Pass (Add one respawn interval to the current expected time)
+  const handleQuickPass = (timer: Timer) => {
+    const boss = BOSS_DATA.find(b => b.name === timer.bossName);
+    if (!boss) return;
+
+    const intervalMs = boss.respawnHours * 60 * 60 * 1000;
+    const currentSpawn = timer.nextSpawn;
+    
+    const updated: Timer = {
+        ...timer,
+        killTime: currentSpawn, // The 'kill/check' time becomes the previous missed spawn
+        nextSpawn: currentSpawn + intervalMs,
+        isPass: true,
+        originalInput: `Quick Pass`
+    };
+    updateTimer(updated);
+    setActionMenuTimer(null);
+  };
+
   const copyToClipboard = () => {
     if (timers.length === 0) return;
 
@@ -270,6 +312,7 @@ const App: React.FC = () => {
           timers={displayedTimers} 
           onRemove={removeTimer} 
           onEdit={setEditingTimer}
+          onSelect={setActionMenuTimer}
           isFiltered={timers.length > 0 && displayedTimers.length === 0}
         />
 
@@ -291,6 +334,15 @@ const App: React.FC = () => {
             timer={editingTimer} 
             onClose={() => setEditingTimer(null)} 
             onSave={handleUpdateTimer} 
+        />
+      )}
+
+      {actionMenuTimer && (
+        <ActionMenu
+            timer={actionMenuTimer}
+            onClose={() => setActionMenuTimer(null)}
+            onKill={handleQuickKill}
+            onPass={handleQuickPass}
         />
       )}
     </div>
