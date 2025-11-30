@@ -1,0 +1,5 @@
+{
+  "name": "Lineage M Boss Timer",
+  "description": "A smart boss timer for Lineage M players. Input kill times naturally (e.g., '0300 東飛') and let Gemini AI handle the scheduling. Features respawn tracking, copy-to-clipboard for clan sharing, and persistent local storage.",
+  "requestFramePermissions": []
+}
