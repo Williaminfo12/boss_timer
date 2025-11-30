@@ -22,6 +22,11 @@
         }
       }
     </script>
+    <script>
+      // Polyfills for y-webrtc/simple-peer compatibility in browser
+      window.global = window;
+      window.process = window.process || { env: { NODE_ENV: 'production' } };
+    </script>
     <style>
       body {
         background-color: #09090b;
