@@ -145,6 +145,8 @@ const App: React.FC = () => {
         killTime,
         nextSpawn: nextSpawnTime,
         isPass,
+        // Reset note if time is manually changed
+        note: undefined, 
         originalInput: `(Edit) ${timeStr} ${timer.bossName}`
     };
 
@@ -165,6 +167,7 @@ const App: React.FC = () => {
         killTime: now,
         nextSpawn: nextSpawn,
         isPass: false,
+        note: undefined, // Clear note on kill
         originalInput: `Quick Kill`
     };
     updateTimer(updated);
@@ -184,7 +187,19 @@ const App: React.FC = () => {
         killTime: currentSpawn, // The 'kill/check' time becomes the previous missed spawn
         nextSpawn: currentSpawn + intervalMs,
         isPass: true,
+        note: undefined, // Clear note on pass
         originalInput: `Quick Pass`
+    };
+    updateTimer(updated);
+    setActionMenuTimer(null);
+  };
+
+  // Quick Action: Mark as Unknown
+  const handleQuickUnknown = (timer: Timer) => {
+    const updated: Timer = {
+        ...timer,
+        note: '未知',
+        originalInput: `Mark Unknown`
     };
     updateTimer(updated);
     setActionMenuTimer(null);
@@ -197,8 +212,14 @@ const App: React.FC = () => {
       const date = new Date(t.nextSpawn);
       const timeStr = date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(':', '');
       const passStr = t.isPass ? '(過)' : '';
+      const noteStr = t.note ? ` (${t.note})` : '';
       const status = Date.now() >= t.nextSpawn ? ' [已出]' : '';
-      return `${timeStr} ${t.bossName}${passStr}${status}`;
+      
+      // Look up alias for clipboard copy too
+      const boss = BOSS_DATA.find(b => b.name === t.bossName);
+      const displayName = boss && boss.aliases.length > 0 ? boss.aliases[0] : t.bossName;
+      
+      return `${timeStr} ${displayName}${passStr}${noteStr}${status}`;
     }).join('\n');
 
     navigator.clipboard.writeText(listText).then(() => {
@@ -214,7 +235,12 @@ const App: React.FC = () => {
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(t => t.bossName.toLowerCase().includes(term));
+      result = result.filter(t => {
+          // Search by name OR alias
+          const boss = BOSS_DATA.find(b => b.name === t.bossName);
+          const aliases = boss ? boss.aliases.join(' ') : '';
+          return t.bossName.toLowerCase().includes(term) || aliases.toLowerCase().includes(term);
+      });
     }
 
     result.sort((a, b) => {
@@ -343,6 +369,7 @@ const App: React.FC = () => {
             onClose={() => setActionMenuTimer(null)}
             onKill={handleQuickKill}
             onPass={handleQuickPass}
+            onUnknown={handleQuickUnknown}
         />
       )}
     </div>

@@ -10,6 +10,7 @@ export interface Timer {
   killTime: number; // Timestamp of the kill/check
   nextSpawn: number; // Timestamp of the next spawn
   isPass: boolean; // If true, marked as "過"
+  note?: string; // New field for notes like "未知"
   originalInput: string;
 }
 

@@ -1,15 +1,16 @@
 import React from 'react';
 import { Timer } from '../types';
-import { X, Sword, StepForward } from 'lucide-react';
+import { X, Sword, StepForward, HelpCircle } from 'lucide-react';
 
 interface ActionMenuProps {
   timer: Timer;
   onClose: () => void;
   onKill: (timer: Timer) => void;
   onPass: (timer: Timer) => void;
+  onUnknown: (timer: Timer) => void;
 }
 
-const ActionMenu: React.FC<ActionMenuProps> = ({ timer, onClose, onKill, onPass }) => {
+const ActionMenu: React.FC<ActionMenuProps> = ({ timer, onClose, onKill, onPass, onUnknown }) => {
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:px-4">
       {/* Backdrop */}
@@ -39,40 +40,58 @@ const ActionMenu: React.FC<ActionMenuProps> = ({ timer, onClose, onKill, onPass 
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-3">
             <button
                 onClick={() => onKill(timer)}
-                className="w-full bg-red-600/90 hover:bg-red-500 text-white p-5 rounded-2xl flex items-center justify-between group transition-all active:scale-[0.98] shadow-lg shadow-red-900/20"
+                className="w-full bg-red-600/90 hover:bg-red-500 text-white p-4 rounded-2xl flex items-center justify-between group transition-all active:scale-[0.98] shadow-lg shadow-red-900/20"
             >
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-red-800/50 rounded-xl group-hover:bg-red-700/50 transition-colors">
-                        <Sword size={28} />
+                    <div className="p-2 bg-red-800/50 rounded-xl group-hover:bg-red-700/50 transition-colors">
+                        <Sword size={24} />
                     </div>
                     <div className="text-left">
-                        <div className="text-lg font-bold">確認擊殺</div>
+                        <div className="text-base font-bold">確認擊殺</div>
                         <div className="text-red-200 text-xs opacity-80">以此時間重新計算</div>
                     </div>
                 </div>
-                <div className="text-2xl font-mono font-bold opacity-50 group-hover:opacity-100 transition-opacity">
+                <div className="text-xl font-mono font-bold opacity-50 group-hover:opacity-100 transition-opacity">
                     NOW
                 </div>
             </button>
 
             <button
                 onClick={() => onPass(timer)}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 p-5 rounded-2xl flex items-center justify-between group transition-all active:scale-[0.98] border border-zinc-700"
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 p-4 rounded-2xl flex items-center justify-between group transition-all active:scale-[0.98] border border-zinc-700"
             >
                 <div className="flex items-center gap-4">
-                     <div className="p-3 bg-zinc-900/50 rounded-xl group-hover:bg-black/40 transition-colors">
-                        <StepForward size={28} />
+                     <div className="p-2 bg-zinc-900/50 rounded-xl group-hover:bg-black/40 transition-colors">
+                        <StepForward size={24} />
                     </div>
                     <div className="text-left">
-                        <div className="text-lg font-bold">標記為 "過"</div>
+                        <div className="text-base font-bold">標記為 "過"</div>
                         <div className="text-zinc-400 text-xs">本次未重生，延後一輪</div>
                     </div>
                 </div>
-                 <div className="text-2xl font-mono font-bold text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                 <div className="text-xl font-mono font-bold text-zinc-500 group-hover:text-zinc-300 transition-colors">
                     +1
+                </div>
+            </button>
+            
+            <button
+                onClick={() => onUnknown(timer)}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 p-4 rounded-2xl flex items-center justify-between group transition-all active:scale-[0.98] border border-zinc-700"
+            >
+                <div className="flex items-center gap-4">
+                     <div className="p-2 bg-zinc-900/50 rounded-xl group-hover:bg-black/40 transition-colors">
+                        <HelpCircle size={24} className="text-yellow-500" />
+                    </div>
+                    <div className="text-left">
+                        <div className="text-base font-bold">備註 (未知)</div>
+                        <div className="text-zinc-400 text-xs">標記為時間不確定</div>
+                    </div>
+                </div>
+                 <div className="text-sm font-bold text-yellow-500 bg-yellow-900/20 px-2 py-1 rounded">
+                    未知
                 </div>
             </button>
         </div>

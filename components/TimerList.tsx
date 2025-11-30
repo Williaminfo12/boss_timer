@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Timer } from '../types';
+import { BOSS_DATA } from '../constants';
 import { Trash2, Clock, CheckCircle2, SearchX, Pencil } from 'lucide-react';
 
 interface TimerListProps {
@@ -44,6 +45,14 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelec
       return 'bg-zinc-800/40 border-l-2 border-l-zinc-600'; // Far
   };
 
+  const getDisplayName = (bossName: string) => {
+    const boss = BOSS_DATA.find(b => b.name === bossName);
+    if (boss && boss.aliases.length > 0) {
+        return boss.aliases[0]; // Use the first alias (short name)
+    }
+    return bossName;
+  };
+
   if (timers.length === 0) {
     if (isFiltered) {
         return (
@@ -79,8 +88,15 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelec
                     </span>
                     
                     <div className="flex flex-col min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                            <span className="font-medium text-zinc-200 truncate leading-tight">{timer.bossName}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-zinc-200 truncate leading-tight">
+                                {getDisplayName(timer.bossName)}
+                            </span>
+                            {timer.note && (
+                                <span className="text-xs font-bold text-yellow-500 bg-yellow-900/30 px-1.5 py-0.5 rounded border border-yellow-700/50">
+                                    {timer.note}
+                                </span>
+                            )}
                             {timer.isPass && (
                                 <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold bg-red-900/50 text-red-200 border border-red-800/50">
                                     過
