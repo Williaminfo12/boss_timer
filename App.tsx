@@ -9,7 +9,7 @@ import EditModal from './components/EditModal';
 import ActionMenu from './components/ActionMenu';
 import ConfigModal from './components/ConfigModal';
 import { useMultiplayerTimers } from './hooks/useMultiplayerTimers';
-import { Copy, AlertTriangle, Search, ArrowUpDown, Database, Wifi, Settings } from 'lucide-react';
+import { Copy, AlertTriangle, Search, ArrowUpDown, Database, Wifi, Settings, Wrench } from 'lucide-react';
 
 type SortOption = 'nextSpawn' | 'name' | 'killTime';
 
@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [localRoomName, setLocalRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
   const [activeRoomName, setActiveRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
 
-  const { timers, addTimer, removeTimer, updateTimer, connected, isConfigured, saveConfig } = useMultiplayerTimers(activeRoomName);
+  const { timers, addTimer, removeTimer, updateTimer, replaceAllTimers, connected, isConfigured, saveConfig } = useMultiplayerTimers(activeRoomName);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -50,23 +50,18 @@ const App: React.FC = () => {
                     const respawnMs = bossData.respawnHours * 60 * 60 * 1000;
                     let newNextSpawn = timer.nextSpawn;
                     
-                    // Add intervals until the spawn time is in the future relative to the original missed slot
-                    // (Or at least pushed forward one cycle)
-                    // Simple logic: Push it 1 cycle forward. 
-                    // If it was missed hours ago, this loop catches it up to "Now + X" or just "Next theoretical slot"
-                    // Requirement: "Enter new round of respawn time"
-                    
+                    // Add intervals until the spawn time is in the future
                     while (newNextSpawn + threshold < now) {
                         newNextSpawn += respawnMs;
                     }
 
-                    // Only update if it actually changed to prevent loops
+                    // Only update if it actually changed
                     if (newNextSpawn !== timer.nextSpawn) {
                         updateTimer({
                             ...timer,
                             nextSpawn: newNextSpawn,
                             note: '遺失', // Mark as Lost
-                            isPass: true // Functionally similar to a pass
+                            isPass: true
                         });
                     }
                 }
@@ -75,7 +70,7 @@ const App: React.FC = () => {
     }, 5000); // Check every 5 seconds
 
     return () => clearInterval(intervalId);
-  }, [timers, connected, updateTimer]); // Dependencies ensure we have fresh data
+  }, [timers, connected, updateTimer]);
 
   const handleRoomNameSubmit = () => {
     if (localRoomName.trim() !== activeRoomName) {
@@ -87,6 +82,48 @@ const App: React.FC = () => {
     if (e.key === 'Enter') {
       handleRoomNameSubmit();
       (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  // --- MAINTENANCE RESET LOGIC ---
+  const handleMaintenanceReset = () => {
+    if (!window.confirm("確定要執行「維修重置」嗎？\n\n這將會清除目前所有計時，並將所有 BOSS 的重生時間設定為本週三早上 09:00。")) {
+        return;
+    }
+
+    const now = new Date();
+    // Find the Wednesday of the current week
+    // Day 0 (Sun) to 6 (Sat). Wednesday is 3.
+    const day = now.getDay();
+    const diff = now.getDate() - day + 3; // Adjust to Wednesday
+    
+    // If today is after Wednesday (Thu-Sat), 'diff' points to this week's Wednesday.
+    // If today is before Wednesday (Sun-Tue), 'diff' points to this week's Wednesday.
+    // If today is Wednesday, 'diff' is today.
+    // However, if we are on Thu, Fri, Sat, usually maintenance was 'yesterday' or 'days ago'.
+    // If we are on Sun, Mon, Tue, usually maintenance is 'upcoming' or we want 'last week'.
+    // Assuming simple logic: "This week's Wednesday"
+    
+    const wednesday = new Date(now.setDate(diff));
+    wednesday.setHours(9, 0, 0, 0);
+
+    const resetTime = wednesday.getTime();
+    
+    const newTimers: Timer[] = BOSS_DATA.map(boss => ({
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate unique IDs
+        bossName: boss.name,
+        // killTime = nextSpawn - respawnTime (Reverse engineered)
+        killTime: resetTime - (boss.respawnHours * 60 * 60 * 1000), 
+        nextSpawn: resetTime,
+        isPass: false,
+        note: '維修',
+        originalInput: 'Maintenance Reset'
+    }));
+
+    if (replaceAllTimers) {
+        replaceAllTimers(newTimers);
+    } else {
+        alert("請重新整理頁面以套用最新功能");
     }
   };
 
@@ -319,19 +356,26 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button 
+                onClick={handleMaintenanceReset}
+                className="p-2 text-zinc-400 hover:text-red-400 transition-colors bg-zinc-900/50 rounded-lg border border-zinc-800"
+                title="維修重置 (週三 09:00)"
+            >
+                <Wrench size={20} />
+            </button>
+            <button 
                 onClick={() => setShowConfig(true)}
-                className="p-2 text-zinc-400 hover:text-blue-400 transition-colors"
+                className="p-2 text-zinc-400 hover:text-blue-400 transition-colors bg-zinc-900/50 rounded-lg border border-zinc-800"
                 title="設定"
             >
-                <Settings size={22} />
+                <Settings size={20} />
             </button>
             <button 
                 onClick={copyToClipboard}
                 disabled={timers.length === 0}
-                className="p-2 text-zinc-400 hover:text-yellow-400 disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors"
+                className="p-2 text-zinc-400 hover:text-yellow-400 disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors bg-zinc-900/50 rounded-lg border border-zinc-800"
                 title="複製清單"
             >
-                <Copy size={22} />
+                <Copy size={20} />
             </button>
           </div>
         </div>

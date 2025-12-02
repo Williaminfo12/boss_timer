@@ -2,7 +2,7 @@ import { Boss, FixedBoss } from './types';
 
 export const BOSS_DATA: Boss[] = [
   { name: '不死鳥', respawnHours: 8, aliases: [] },
-  { name: '伊弗利特', respawnHours: 2, aliases: ['EF', 'ef'] },
+  { name: '伊弗利特', respawnHours: 2, aliases: ['伊佛', 'EF', 'ef'] },
   { name: '大黑長者', respawnHours: 3, aliases: ['大黑'] },
   { name: '暗黑長者', respawnHours: 6, aliases: [] },
   { name: '巨大飛龍', respawnHours: 6, aliases: ['巨飛'] },

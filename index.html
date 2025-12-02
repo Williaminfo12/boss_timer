@@ -23,15 +23,13 @@
       }
     </script>
     
-    <!-- Load Firebase 10.14.1 Compat SDKs (Latest Stable) -->
-    <!-- crossorigin="anonymous" is critical to prevent generic 'Script error' messages -->
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" crossorigin="anonymous"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js" crossorigin="anonymous"></script>
+    <!-- Load Firebase 8.10.1 (Legacy Stable) WITHOUT crossorigin to avoid CORS/Script errors -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script>
       // Global Error Handler
       window.onerror = function(msg, url, line, col, error) {
-        // Ignore benign ResizeObserver errors
         if (msg && typeof msg === 'string' && msg.includes('ResizeObserver')) return;
         console.error("Global Error:", msg, error);
       };

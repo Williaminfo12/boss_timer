@@ -165,12 +165,25 @@ export const useMultiplayerTimers = (roomName: string) => {
     const safeTimer = sanitizeTimer(timer);
     dbRef.current.ref(`rooms/${normalizedRoom}/timers/${timer.id}`).set(safeTimer);
   };
+
+  const replaceAllTimers = (newTimers: Timer[]) => {
+    if (!dbRef.current || !roomName) return;
+    const normalizedRoom = roomName.trim().toLowerCase() || 'main';
+    
+    const timersObj: Record<string, any> = {};
+    newTimers.forEach(t => {
+        timersObj[t.id] = sanitizeTimer(t);
+    });
+    
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers`).set(timersObj);
+  };
   
   return {
     timers,
     addTimer,
     removeTimer,
     updateTimer,
+    replaceAllTimers,
     connected,
     isConfigured,
     saveConfig
