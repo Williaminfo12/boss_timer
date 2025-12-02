@@ -22,4 +22,12 @@ export interface ParsedCommand {
   error?: string;
 }
 
+export interface FixedBoss {
+  name: string;
+  location?: string;
+  spawnTimes: string[]; // e.g., ["06:00", "12:00"]
+  days?: number[]; // 0=Sun, 1=Mon... undefined = everyday
+  description?: string;
+}
+
 export type InputMode = 'kill' | 'spawn';

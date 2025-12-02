@@ -129,6 +129,11 @@ export const useMultiplayerTimers = (roomName: string) => {
     };
   }, [roomName, connected]); // Wait for connection
 
+  // Helper to remove undefined keys which Firebase doesn't support
+  const sanitizeTimer = (timer: Timer) => {
+      return JSON.parse(JSON.stringify(timer));
+  };
+
   // Actions
   const addTimer = (timer: Timer) => {
     if (!dbRef.current || !roomName) return;
@@ -141,7 +146,9 @@ export const useMultiplayerTimers = (roomName: string) => {
     if (existing) {
         updates[`rooms/${normalizedRoom}/timers/${existing.id}`] = null;
     }
-    updates[`rooms/${normalizedRoom}/timers/${timer.id}`] = timer;
+    
+    const safeTimer = sanitizeTimer(timer);
+    updates[`rooms/${normalizedRoom}/timers/${timer.id}`] = safeTimer;
     
     dbRef.current.ref().update(updates);
   };
@@ -155,7 +162,8 @@ export const useMultiplayerTimers = (roomName: string) => {
   const updateTimer = (timer: Timer) => {
     if (!dbRef.current || !roomName) return;
     const normalizedRoom = roomName.trim().toLowerCase() || 'main';
-    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${timer.id}`).set(timer);
+    const safeTimer = sanitizeTimer(timer);
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${timer.id}`).set(safeTimer);
   };
   
   return {

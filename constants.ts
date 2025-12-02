@@ -1,9 +1,10 @@
-import { Boss } from './types';
+import { Boss, FixedBoss } from './types';
 
 export const BOSS_DATA: Boss[] = [
   { name: '不死鳥', respawnHours: 8, aliases: [] },
   { name: '伊弗利特', respawnHours: 2, aliases: ['EF', 'ef'] },
   { name: '大黑長者', respawnHours: 3, aliases: ['大黑'] },
+  { name: '暗黑長者', respawnHours: 6, aliases: [] },
   { name: '巨大飛龍', respawnHours: 6, aliases: ['巨飛'] },
   { name: '861左飛龍', respawnHours: 2, aliases: ['西左', '左飛'] },
   { name: '862右飛龍', respawnHours: 2, aliases: ['西右', '右飛'] },
@@ -32,6 +33,80 @@ export const BOSS_DATA: Boss[] = [
   { name: '大腳瑪幽', respawnHours: 3, aliases: ['大腳'] },
   { name: '巨大守護螞蟻', respawnHours: 3.5, aliases: ['螞蟻'] },
   { name: '巨型蠕蟲(海底)', respawnHours: 2, aliases: ['海蟲'] },
+];
+
+export const FIXED_BOSS_DATA: FixedBoss[] = [
+  { 
+    name: '奇岩1樓', 
+    location: '奇岩地監',
+    spawnTimes: ['06:00', '12:00', '18:00', '00:00'], 
+    days: [1, 2, 3, 4, 5], // Mon-Fri
+    description: '週一至週五' 
+  },
+  { 
+    name: '奇岩2樓', 
+    location: '奇岩地監',
+    spawnTimes: ['07:00', '14:00', '21:00'], 
+    days: [1, 2, 3, 4, 5], 
+    description: '週一至週五' 
+  },
+  { 
+    name: '奇岩3樓', 
+    location: '奇岩地監',
+    spawnTimes: ['20:15'], 
+    days: [1, 2, 3, 4, 5], 
+    description: '週一至週五' 
+  },
+  { 
+    name: '奇岩4樓', 
+    location: '奇岩地監',
+    spawnTimes: ['21:15'], 
+    days: [1, 2, 3, 4, 5], 
+    description: '週一至週五' 
+  },
+  { 
+    name: '魔法師', 
+    spawnTimes: ['01:00', '03:00', '05:00', '07:00', '09:00', '11:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'], 
+    description: '每天單數小時' 
+  },
+  { 
+    name: '巴風特', 
+    location: '冒險洞穴',
+    spawnTimes: ['14:00', '20:00'], 
+    description: '14:00~14:30 / 20:00~20:30 (間隔6H)' 
+  },
+  { 
+    name: '暗黑地監4F王(週日)', 
+    spawnTimes: ['18:00'], 
+    days: [0], // Sunday
+    description: '週日限定' 
+  },
+  { 
+    name: '惡魔', 
+    location: '象牙塔',
+    spawnTimes: ['22:00'], 
+    description: '每天' 
+  },
+  { 
+    name: '古代兵器復仇者', 
+    spawnTimes: ['22:30'], 
+    description: '每天' 
+  },
+  { 
+    name: '異界的惡魔', 
+    spawnTimes: ['23:00'], 
+    description: '每天' 
+  },
+  { 
+    name: '烈焰的死亡騎士', 
+    spawnTimes: ['23:30'], 
+    description: '每天' 
+  },
+  { 
+    name: '暗黑地監4F王(夜)', 
+    spawnTimes: ['00:00'], 
+    description: '每天' 
+  },
 ];
 
 export const APP_TITLE = "天堂M BOSS 計時器";

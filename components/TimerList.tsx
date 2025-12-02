@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Timer } from '../types';
 import { BOSS_DATA } from '../constants';
-import { Trash2, Clock, CheckCircle2, SearchX, Pencil } from 'lucide-react';
+import { Trash2, Clock, CheckCircle2, SearchX, Pencil, Sword, StepForward } from 'lucide-react';
 
 interface TimerListProps {
   timers: Timer[];
   onRemove: (id: string) => void;
   onEdit: (timer: Timer) => void;
   onSelect: (timer: Timer) => void;
+  onKill: (timer: Timer) => void;
+  onPass: (timer: Timer) => void;
   isFiltered?: boolean;
 }
 
-const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelect, isFiltered = false }) => {
+const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelect, onKill, onPass, isFiltered = false }) => {
   // Trigger re-render every minute to update "time remaining" logic if needed
   const [, setTick] = useState(0);
 
@@ -93,7 +95,11 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelec
                                 {getDisplayName(timer.bossName)}
                             </span>
                             {timer.note && (
-                                <span className="text-xs font-bold text-yellow-500 bg-yellow-900/30 px-1.5 py-0.5 rounded border border-yellow-700/50">
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${
+                                    timer.note === '遺失' 
+                                    ? 'text-zinc-400 bg-zinc-800/50 border-zinc-600/50' 
+                                    : 'text-yellow-500 bg-yellow-900/30 border-yellow-700/50'
+                                }`}>
                                     {timer.note}
                                 </span>
                             )}
@@ -114,13 +120,38 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelec
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1 ml-2">
+                <div className="flex items-center gap-1.5 ml-2">
+                  {/* Quick Actions - Prominent Buttons */}
+                  <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onKill(timer);
+                      }}
+                      className="flex items-center justify-center w-10 h-10 bg-red-600 text-white hover:bg-red-500 rounded-lg transition-all shadow-lg shadow-red-900/40 active:scale-95 border border-red-500/50"
+                      title="確認擊殺 (Kill)"
+                  >
+                      <Sword size={18} />
+                  </button>
+                  <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPass(timer);
+                      }}
+                      className="flex items-center justify-center w-10 h-10 bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white rounded-lg transition-all shadow-lg active:scale-95 border border-zinc-600/50"
+                      title="標記為過 (Pass)"
+                  >
+                      <StepForward size={18} />
+                  </button>
+
+                  <div className="w-px h-6 bg-zinc-800 mx-0.5 hidden sm:block"></div>
+
+                  {/* Management Actions */}
                   <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onEdit(timer);
                       }}
-                      className="p-2 text-zinc-500 hover:text-blue-400 hover:bg-zinc-700/50 rounded-lg transition-colors"
+                      className="p-2 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 rounded-lg transition-colors hidden sm:block"
                       aria-label="Edit timer"
                   >
                       <Pencil size={18} />
@@ -130,7 +161,7 @@ const TimerList: React.FC<TimerListProps> = ({ timers, onRemove, onEdit, onSelec
                         e.stopPropagation();
                         onRemove(timer.id);
                       }}
-                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-700/50 rounded-lg transition-colors"
+                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors hidden sm:block"
                       aria-label="Remove timer"
                   >
                       <Trash2 size={18} />

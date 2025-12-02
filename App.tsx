@@ -4,6 +4,7 @@ import { BOSS_DATA, APP_TITLE, FIREBASE_CONFIG } from './constants';
 import { parseCommandWithGemini } from './services/geminiService';
 import InputBar from './components/InputBar';
 import TimerList from './components/TimerList';
+import FixedBossList from './components/FixedBossList'; // Import new component
 import EditModal from './components/EditModal';
 import ActionMenu from './components/ActionMenu';
 import ConfigModal from './components/ConfigModal';
@@ -31,6 +32,50 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('lm_room_id', activeRoomName);
   }, [activeRoomName]);
+
+  // --- AUTOMATIC LOST CHECK ---
+  // Checks every 5 seconds if any boss is overdue by > 5 minutes
+  useEffect(() => {
+    if (!connected || timers.length === 0) return;
+
+    const intervalId = setInterval(() => {
+        const now = Date.now();
+        const threshold = 5 * 60 * 1000; // 5 minutes tolerance
+
+        timers.forEach(timer => {
+            // If current time is past (nextSpawn + 5 mins)
+            if (now > timer.nextSpawn + threshold) {
+                const bossData = BOSS_DATA.find(b => b.name === timer.bossName);
+                if (bossData) {
+                    const respawnMs = bossData.respawnHours * 60 * 60 * 1000;
+                    let newNextSpawn = timer.nextSpawn;
+                    
+                    // Add intervals until the spawn time is in the future relative to the original missed slot
+                    // (Or at least pushed forward one cycle)
+                    // Simple logic: Push it 1 cycle forward. 
+                    // If it was missed hours ago, this loop catches it up to "Now + X" or just "Next theoretical slot"
+                    // Requirement: "Enter new round of respawn time"
+                    
+                    while (newNextSpawn + threshold < now) {
+                        newNextSpawn += respawnMs;
+                    }
+
+                    // Only update if it actually changed to prevent loops
+                    if (newNextSpawn !== timer.nextSpawn) {
+                        updateTimer({
+                            ...timer,
+                            nextSpawn: newNextSpawn,
+                            note: '遺失', // Mark as Lost
+                            isPass: true // Functionally similar to a pass
+                        });
+                    }
+                }
+            }
+        });
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(intervalId);
+  }, [timers, connected, updateTimer]); // Dependencies ensure we have fresh data
 
   const handleRoomNameSubmit = () => {
     if (localRoomName.trim() !== activeRoomName) {
@@ -304,7 +349,13 @@ const App: React.FC = () => {
             <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-xl flex flex-col gap-2 text-blue-200 text-center items-center">
                 <Database size={32} />
                 <h3 className="font-bold text-lg">尚未設定資料庫</h3>
-                <p className="text-sm opacity-80">使用內建設定連線中...</p>
+                <p className="text-sm opacity-80">請點擊右上角設定圖示，貼上 Firebase 設定檔以啟用多人連線功能。</p>
+                <button 
+                    onClick={() => setShowConfig(true)}
+                    className="mt-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold"
+                >
+                    立即設定
+                </button>
             </div>
         )}
 
@@ -340,10 +391,12 @@ const App: React.FC = () => {
           onRemove={removeTimer} 
           onEdit={setEditingTimer}
           onSelect={setActionMenuTimer}
+          onKill={handleQuickKill}
+          onPass={handleQuickPass}
           isFiltered={timers.length > 0 && displayedTimers.length === 0}
         />
 
-        {timers.length === 0 && !isProcessing && (
+        {timers.length === 0 && !isProcessing && isConfigured && (
            <div className="mt-8 p-6 bg-zinc-900/50 border border-zinc-800 rounded-2xl text-center">
               <p className="text-zinc-500 mb-2">請於下方輸入時間開始</p>
               <div className="inline-flex flex-col items-start bg-black/40 p-4 rounded-lg text-sm text-zinc-400 font-mono gap-1">
@@ -352,6 +405,8 @@ const App: React.FC = () => {
               </div>
            </div>
         )}
+
+        <FixedBossList />
       </main>
 
       <InputBar onSubmit={handleCommand} isProcessing={isProcessing} />
