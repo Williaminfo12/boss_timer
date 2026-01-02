@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Timer, InputMode } from './types';
 import { BOSS_DATA, APP_TITLE, FIREBASE_CONFIG } from './constants';
 import { parseCommandWithGemini } from './services/geminiService';
@@ -10,17 +10,20 @@ import EditModal from './components/EditModal';
 import ActionMenu from './components/ActionMenu';
 import ConfigModal from './components/ConfigModal';
 import { useMultiplayerTimers } from './hooks/useMultiplayerTimers';
-import { Copy, AlertTriangle, Search, ArrowUpDown, Database, Wifi, Settings, Wrench, LifeBuoy, Download } from 'lucide-react';
+import { Copy, AlertTriangle, Search, ArrowUpDown, Database, Wifi, Settings, Wrench, LifeBuoy, History, X, Lock } from 'lucide-react';
 
 type SortOption = 'nextSpawn' | 'name' | 'killTime';
 
 const App: React.FC = () => {
   const [localRoomName, setLocalRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
   const [activeRoomName, setActiveRoomName] = useState(() => localStorage.getItem('lm_room_id') || 'main');
+  const [showRoomHistory, setShowRoomHistory] = useState(false);
 
   const { 
       timers, 
       localCache, 
+      roomHistory,
+      permissionDenied,
       addTimer, 
       removeTimer, 
       updateTimer, 
@@ -37,6 +40,8 @@ const App: React.FC = () => {
   const [editingTimer, setEditingTimer] = useState<Timer | null>(null);
   const [actionMenuTimer, setActionMenuTimer] = useState<Timer | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+
+  const roomInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     localStorage.setItem('lm_room_id', activeRoomName);
@@ -66,13 +71,18 @@ const App: React.FC = () => {
   }, [timers, connected, updateTimer]);
 
   const handleRestoreFromCache = () => {
-      if (localCache.length > 0 && window.confirm(`發現本地備份 (${localCache.length} 筆資料)，是否要還原至目前 Room?`)) {
+      if (localCache.length > 0 && window.confirm(`確認還原目前 Room 的備份資料 (${localCache.length} 筆)？`)) {
           replaceAllTimers(localCache);
       }
   };
 
-  const handleRoomNameSubmit = () => {
-    if (localRoomName.trim() !== activeRoomName) setActiveRoomName(localRoomName.trim());
+  const handleRoomNameSubmit = (name?: string) => {
+    const finalName = name || localRoomName;
+    if (finalName.trim() && finalName.trim() !== activeRoomName) {
+        setActiveRoomName(finalName.trim());
+        setLocalRoomName(finalName.trim());
+    }
+    setShowRoomHistory(false);
   };
 
   const handleMaintenanceReset = () => {
@@ -159,11 +169,37 @@ const App: React.FC = () => {
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 rounded-lg bg-yellow-600 flex items-center justify-center font-bold">M</div>
-             <div className="flex flex-col">
+             <div className="flex flex-col relative">
                 <h1 className="text-lg font-bold text-white leading-none">{APP_TITLE}</h1>
                 <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-zinc-500">Room:</span>
-                    <input value={localRoomName} onChange={e => setLocalRoomName(e.target.value)} onBlur={handleRoomNameSubmit} className="bg-transparent border-b border-zinc-700 text-[10px] text-zinc-300 w-16 focus:outline-none" />
+                    <div className="relative">
+                        <input 
+                            ref={roomInputRef}
+                            value={localRoomName} 
+                            onChange={e => setLocalRoomName(e.target.value)} 
+                            onFocus={() => setShowRoomHistory(true)}
+                            onBlur={() => setTimeout(() => setShowRoomHistory(false), 200)}
+                            onKeyDown={e => e.key === 'Enter' && handleRoomNameSubmit()}
+                            className="bg-transparent border-b border-zinc-700 text-[10px] text-zinc-300 w-24 focus:outline-none focus:border-yellow-600 transition-colors" 
+                        />
+                        {showRoomHistory && roomHistory.length > 0 && (
+                            <div className="absolute top-full left-0 mt-1 w-32 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 z-50">
+                                <div className="px-2 py-1 text-[9px] text-zinc-500 flex items-center gap-1 border-b border-zinc-800">
+                                    <History size={10} /> 最近造訪
+                                </div>
+                                {roomHistory.map(r => (
+                                    <button 
+                                        key={r} 
+                                        onMouseDown={() => handleRoomNameSubmit(r)}
+                                        className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-zinc-800 text-zinc-300 transition-colors truncate"
+                                    >
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                     <div className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? 'text-green-400 bg-green-900/30' : 'text-zinc-400 bg-zinc-800'}`}>
                         {connected ? '已連線' : '離線'}
                     </div>
@@ -171,27 +207,56 @@ const App: React.FC = () => {
              </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleMaintenanceReset} className="p-2 text-zinc-400 bg-zinc-900/50 rounded-lg border border-zinc-800"><Wrench size={20} /></button>
-            <button onClick={() => setShowConfig(true)} className="p-2 text-zinc-400 bg-zinc-900/50 rounded-lg border border-zinc-800"><Settings size={20} /></button>
-            <button onClick={copyToClipboard} disabled={timers.length === 0} className="p-2 text-zinc-400 bg-zinc-900/50 rounded-lg border border-zinc-800"><Copy size={20} /></button>
+            <button onClick={handleMaintenanceReset} className="p-2 text-zinc-400 bg-zinc-900/50 rounded-lg border border-zinc-800 hover:text-white transition-colors"><Wrench size={20} /></button>
+            <button onClick={() => setShowConfig(true)} className="p-2 text-zinc-400 bg-zinc-900/50 rounded-lg border border-zinc-800 hover:text-white transition-colors"><Settings size={20} /></button>
+            <button onClick={copyToClipboard} disabled={timers.length === 0} className="p-2 text-zinc-400 bg-zinc-900/50 rounded-lg border border-zinc-800 hover:text-white transition-colors"><Copy size={20} /></button>
           </div>
         </div>
       </header>
 
       <main className="pt-20 px-4 max-w-3xl mx-auto">
+        {/* CRITICAL: PERMISSION DENIED WARNING */}
+        {permissionDenied && (
+            <div className="mb-6 p-5 bg-red-950/50 border-2 border-red-500 rounded-2xl animate-pulse">
+                <div className="flex items-start gap-4 text-red-100">
+                    <Lock className="shrink-0 mt-1" size={24} />
+                    <div className="space-y-2">
+                        <p className="font-bold text-lg">資料庫讀寫權限已過期 (2026年問題)</p>
+                        <p className="text-sm opacity-90 leading-relaxed">
+                            您的 Firebase Rules 設定在 2025/12/30 已到期。請登入 Firebase Console 將 Rules 中的 <code className="bg-black/40 px-1 rounded">now {"<"} 1767024000000</code> 改為 <code className="bg-black/40 px-1 rounded">true</code> 即可復原。
+                        </p>
+                        <div className="flex gap-3 pt-1">
+                            <a href="https://console.firebase.google.com/" target="_blank" className="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">前往 Firebase 控制台</a>
+                            {localCache.length > 0 && (
+                                <button onClick={handleRestoreFromCache} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">使用本地備份暫時恢復</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {errorMsg && <div className="mb-4 p-4 bg-red-900/20 border border-red-800/50 rounded-xl text-red-200">{errorMsg}</div>}
         
         {/* EMERGENCY RESTORE BUTTON */}
-        {timers.length === 0 && localCache.length > 0 && (
-            <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-xl flex items-center justify-between">
+        {!permissionDenied && timers.length === 0 && localCache.length > 0 && (
+            <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-xl flex items-center justify-between animate-in slide-in-from-top duration-500">
                 <div className="flex items-center gap-3 text-yellow-200">
                     <LifeBuoy className="animate-pulse" />
                     <div>
-                        <p className="font-bold">發現資料消失？</p>
-                        <p className="text-xs opacity-80">瀏覽器存有 {localCache.length} 筆最後同步的備份。</p>
+                        <p className="font-bold">雲端資料為空</p>
+                        <p className="text-xs opacity-80">本地尚存有 {localCache.length} 筆最後同步的資料。</p>
                     </div>
                 </div>
-                <button onClick={handleRestoreFromCache} className="bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg text-sm font-bold">還原救回</button>
+                <button onClick={handleRestoreFromCache} className="bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg text-sm font-bold shadow-lg transition-transform active:scale-95">點此還原</button>
+            </div>
+        )}
+
+        {timers.length === 0 && localCache.length === 0 && connected && !permissionDenied && (
+            <div className="text-center py-20 px-4 text-zinc-500">
+                <Search size={40} className="mx-auto mb-4 opacity-20" />
+                <p>目前 Room `{activeRoomName}` 尚無資料</p>
+                <p className="text-xs mt-1">請嘗試輸入計時，或切換 Room 確認資料。</p>
             </div>
         )}
 
@@ -214,10 +279,12 @@ const App: React.FC = () => {
       {editingTimer && <EditModal timer={editingTimer} onClose={() => setEditingTimer(null)} onSave={(id, tStr, m, p) => {
           const boss = BOSS_DATA.find(b => b.name === editingTimer.bossName);
           if (!boss) return;
-          let h = parseInt(tStr.length === 3 ? tStr[0] : tStr.substring(0, 2));
-          let m_val = parseInt(tStr.length === 3 ? tStr.substring(1) : tStr.substring(2));
-          let inputDate = new Date(); inputDate.setHours(h, m_val, 0, 0);
-          let killTime = inputDate.getTime(), nextSpawn = killTime + boss.respawnHours * 3600000;
+          const h = parseInt(tStr.length === 3 ? tStr[0] : tStr.substring(0, 2));
+          const m_val = parseInt(tStr.length === 3 ? tStr.substring(1) : tStr.substring(2));
+          const inputDate = new Date(); 
+          inputDate.setHours(h, m_val, 0, 0);
+          const killTime = inputDate.getTime();
+          const nextSpawn = killTime + boss.respawnHours * 3600000;
           updateTimer({ ...editingTimer, killTime, nextSpawn, isPass: p });
           setEditingTimer(null);
       }} />}

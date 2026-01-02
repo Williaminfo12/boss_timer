@@ -11,14 +11,24 @@ declare global {
 
 const CONFIG_STORAGE_KEY = 'lm_firebase_config';
 const CACHE_PREFIX = 'lm_cache_';
+const ROOM_HISTORY_KEY = 'lm_room_history';
 
 export const useMultiplayerTimers = (roomName: string) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [connected, setConnected] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [localCache, setLocalCache] = useState<Timer[]>([]);
+  const [roomHistory, setRoomHistory] = useState<string[]>([]);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   
   const dbRef = useRef<any>(null);
+
+  useEffect(() => {
+    const history = localStorage.getItem(ROOM_HISTORY_KEY);
+    if (history) {
+        try { setRoomHistory(JSON.parse(history)); } catch(e) {}
+    }
+  }, []);
 
   useEffect(() => {
     const initFirebase = () => {
@@ -33,9 +43,7 @@ export const useMultiplayerTimers = (roomName: string) => {
         if (customConfigStr) {
             try {
                 const parsed = JSON.parse(customConfigStr);
-                if (parsed.apiKey && parsed.databaseURL) {
-                    configToUse = parsed;
-                }
+                if (parsed.apiKey && parsed.databaseURL) configToUse = parsed;
             } catch (e) {
                 localStorage.removeItem(CONFIG_STORAGE_KEY);
             }
@@ -68,34 +76,45 @@ export const useMultiplayerTimers = (roomName: string) => {
     initFirebase();
   }, []);
 
-  // Load and update local cache
   useEffect(() => {
     const normalizedRoom = roomName.trim().toLowerCase() || 'main';
+    
+    setRoomHistory(prev => {
+        const next = [normalizedRoom, ...prev.filter(r => r !== normalizedRoom)].slice(0, 5);
+        localStorage.setItem(ROOM_HISTORY_KEY, JSON.stringify(next));
+        return next;
+    });
+
     const cached = localStorage.getItem(CACHE_PREFIX + normalizedRoom);
     if (cached) {
-        try {
-            setLocalCache(JSON.parse(cached));
-        } catch (e) {
-            console.error("Cache load error", e);
-        }
+        try { setLocalCache(JSON.parse(cached)); } catch (e) {}
+    } else {
+        setLocalCache([]);
     }
 
     if (!dbRef.current || !roomName) return;
 
+    setPermissionDenied(false);
     const timersRef = dbRef.current.ref(`rooms/${normalizedRoom}/timers`);
+    
     const handleValue = (snapshot: any) => {
       const data = snapshot.val();
       const loadedTimers = data ? (Object.values(data) as Timer[]) : [];
       setTimers(loadedTimers);
-      
-      // Update local cache whenever we get new data from cloud
       if (loadedTimers.length > 0) {
           localStorage.setItem(CACHE_PREFIX + normalizedRoom, JSON.stringify(loadedTimers));
           setLocalCache(loadedTimers);
       }
     };
 
-    timersRef.on('value', handleValue);
+    const handleError = (error: any) => {
+        console.error("Firebase Error:", error);
+        if (error.code === 'PERMISSION_DENIED') {
+            setPermissionDenied(true);
+        }
+    };
+
+    timersRef.on('value', handleValue, handleError);
     return () => timersRef.off('value', handleValue);
   }, [roomName, connected]);
 
@@ -108,19 +127,25 @@ export const useMultiplayerTimers = (roomName: string) => {
     const updates: any = {};
     if (existing) updates[`rooms/${normalizedRoom}/timers/${existing.id}`] = null;
     updates[`rooms/${normalizedRoom}/timers/${timer.id}`] = sanitizeTimer(timer);
-    dbRef.current.ref().update(updates);
+    dbRef.current.ref().update(updates).catch((e: any) => {
+        if (e.code === 'PERMISSION_DENIED') setPermissionDenied(true);
+    });
   };
 
   const removeTimer = (id: string) => {
     if (!dbRef.current) return;
     const normalizedRoom = roomName.trim().toLowerCase() || 'main';
-    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${id}`).remove();
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${id}`).remove().catch((e: any) => {
+        if (e.code === 'PERMISSION_DENIED') setPermissionDenied(true);
+    });
   };
 
   const updateTimer = (timer: Timer) => {
     if (!dbRef.current) return;
     const normalizedRoom = roomName.trim().toLowerCase() || 'main';
-    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${timer.id}`).set(sanitizeTimer(timer));
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers/${timer.id}`).set(sanitizeTimer(timer)).catch((e: any) => {
+        if (e.code === 'PERMISSION_DENIED') setPermissionDenied(true);
+    });
   };
 
   const replaceAllTimers = (newTimers: Timer[]) => {
@@ -128,12 +153,16 @@ export const useMultiplayerTimers = (roomName: string) => {
     const normalizedRoom = roomName.trim().toLowerCase() || 'main';
     const timersObj: Record<string, any> = {};
     newTimers.forEach(t => { timersObj[t.id] = sanitizeTimer(t); });
-    dbRef.current.ref(`rooms/${normalizedRoom}/timers`).set(timersObj);
+    dbRef.current.ref(`rooms/${normalizedRoom}/timers`).set(timersObj).catch((e: any) => {
+        if (e.code === 'PERMISSION_DENIED') setPermissionDenied(true);
+    });
   };
   
   return {
     timers,
     localCache,
+    roomHistory,
+    permissionDenied,
     addTimer,
     removeTimer,
     updateTimer,
