@@ -86,7 +86,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({ timer, onClose, onKill, onPass,
                         <HelpCircle size={24} className="text-yellow-500" />
                     </div>
                     <div className="text-left">
-                        <div className="text-base font-bold">備註 (未知)</div>
+                        <div className="text-base font-bold">備註 (敵人吃)</div>
                         <div className="text-zinc-400 text-xs">標記為時間不確定</div>
                     </div>
                 </div>
