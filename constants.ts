@@ -15,7 +15,6 @@ export const BOSS_DATA: Boss[] = [
   { name: '綠王', respawnHours: 2, aliases: [] },
   { name: '紅王', respawnHours: 2, aliases: [] },
   { name: '四色', respawnHours: 2, aliases: [] },
-  { name: '魔法師', respawnHours: 2, aliases: [] },
   { name: '死亡騎士', respawnHours: 4, aliases: ['死騎'] },
   { name: '力卡溫', respawnHours: 8, aliases: ['狼王'] },
   { name: '克特', respawnHours: 10, aliases: [] },
@@ -63,11 +62,6 @@ export const FIXED_BOSS_DATA: FixedBoss[] = [
     spawnTimes: ['21:15'], 
     days: [1, 2, 3, 4, 5], 
     description: '週一至週五' 
-  },
-  { 
-    name: '魔法師', 
-    spawnTimes: ['01:00', '03:00', '05:00', '07:00', '09:00', '11:00', '13:00', '15:00', '17:00', '19:00', '21:00', '23:00'], 
-    description: '每天單數小時' 
   },
   { 
     name: '巴風特', 
